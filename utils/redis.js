@@ -3,6 +3,7 @@ import { promisify } from 'util';
 
 class RedisClient {
   constructor() {
+<<<<<<< HEAD
     const client = createClient();
     client.on('error', (err) => {
       console.log('Redis Client Error', err);
@@ -15,6 +16,16 @@ class RedisClient {
 
   isAlive() {
     if (this.client) {
+=======
+    this.client = createClient();
+    this.client.on('error', (error) => {
+      console.log(error.message);
+    });
+  }
+
+  isAlive() {
+    if (this.client.ready) {
+>>>>>>> b8e5319dea3e8e9fe96627fb2354b4b2791ec2ea
       return true;
     }
     return false;
