@@ -15,8 +15,15 @@ class FilesCollection {
 
   static async getPage(query, page) {
     const collection = dbClient.getCollection('files');
-    const file = await collection.find(query, { skip: (page) * 20, limit: 20 }).toArray();
+    const file = await collection
+      .find(query, { skip: page * 20, limit: 20 })
+      .toArray();
     return file;
+  }
+
+  static async updateFile(query, update) {
+    const collection = dbClient.getCollection('files');
+    await collection.updateOne(query, update);
   }
 }
 

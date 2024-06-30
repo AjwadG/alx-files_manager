@@ -145,6 +145,76 @@ class FilesController {
       })),
     );
   }
+
+  static async putPublish(req, res) {
+    const token = req.headers['x-token'];
+    const { id } = req.params;
+    const userId = token ? await redisClient.get(`auth_${token}`) : null;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const user = await UserCollection.getUser({
+      _id: mongodb.ObjectId(userId),
+    });
+    if (!user || user.length === 0) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const query = {
+      _id: mongodb.ObjectId(id),
+      userId: mongodb.ObjectId(userId),
+    };
+    const file = await FilesCollection.getFile(query);
+    if (!file || file.length === 0) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    await FilesCollection.updateFile(
+      { _id: file[0]._id },
+      { $set: { isPublic: true } },
+    );
+    return res.status(200).json({
+      id: file[0]._id,
+      userId: file[0].userId,
+      name: file[0].name,
+      type: file[0].type,
+      isPublic: true,
+      parentId: file[0].parentId,
+    });
+  }
+
+  static async putUnpublish(req, res) {
+    const token = req.headers['x-token'];
+    const { id } = req.params;
+    const userId = token ? await redisClient.get(`auth_${token}`) : null;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const user = await UserCollection.getUser({
+      _id: mongodb.ObjectId(userId),
+    });
+    if (!user || user.length === 0) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const query = {
+      _id: mongodb.ObjectId(id),
+      userId: mongodb.ObjectId(userId),
+    };
+    const file = await FilesCollection.getFile(query);
+    if (!file || file.length === 0) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    await FilesCollection.updateFile(
+      { _id: file[0]._id },
+      { $set: { isPublic: false } },
+    );
+    return res.status(200).json({
+      id: file[0]._id,
+      userId: file[0].userId,
+      name: file[0].name,
+      type: file[0].type,
+      isPublic: false,
+      parentId: file[0].parentId,
+    });
+  }
 }
 
 export default FilesController;

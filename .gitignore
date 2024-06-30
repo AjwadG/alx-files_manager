@@ -130,3 +130,5 @@ dist
 .pnp.*
 
 *main.*
+files_manager/*
+files_manager
