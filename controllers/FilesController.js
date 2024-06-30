@@ -48,14 +48,14 @@ class FilesController {
         name,
         type,
         parentId: parentId || 0,
-        isPublic: isPublic === 'true',
+        isPublic: !!isPublic,
       });
       return res.status(201).json({
         id: fileId,
         userId: id,
         name,
         type,
-        isPublic: isPublic === 'true',
+        isPublic: !!isPublic,
         parentId: parentId ? mongodb.ObjectId(parentId) : 0,
       });
     }
@@ -69,7 +69,7 @@ class FilesController {
       userId: mongodb.ObjectId(id),
       type,
       parentId: parentId ? mongodb.ObjectId(parentId) : 0,
-      isPublic: isPublic === 'true',
+      isPublic: !!isPublic,
       localPath: `${folderPath}/${fileName}`,
     });
     const filePath = `${folderPath}/${fileId}`;
@@ -80,9 +80,70 @@ class FilesController {
       userId: id,
       name,
       type,
-      isPublic: isPublic === 'true',
+      isPublic: !!isPublic,
       parentId: parentId || 0,
     });
+  }
+
+  static async getShow(req, res) {
+    const { id } = req.params;
+    const token = req.headers['x-token'];
+    const userId = token ? await redisClient.get(`auth_${token}`) : null;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const user = await UserCollection.getUser({
+      _id: mongodb.ObjectId(userId),
+    });
+    if (!user || user.length === 0) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const file = await FilesCollection.getFile({
+      _id: mongodb.ObjectId(id),
+      userId: mongodb.ObjectId(userId),
+    });
+    if (!file || file.length === 0) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    return res.status(200).json({
+      id: file[0]._id,
+      userId: file[0].userId,
+      name: file[0].name,
+      type: file[0].type,
+      isPublic: !!file[0].isPublic,
+      parentId: file[0].parentId,
+    });
+  }
+
+  static async getIndex(req, res) {
+    const token = req.headers['x-token'];
+    const { parentId, page } = req.query;
+    const userId = token ? await redisClient.get(`auth_${token}`) : null;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const user = await UserCollection.getUser({
+      _id: mongodb.ObjectId(userId),
+    });
+    if (!user || user.length === 0) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const id = !parentId || parentId === '0' ? 0 : mongodb.ObjectId(parentId);
+    const query = {
+      parentId: id,
+    };
+    const files = await FilesCollection.getPage(query, page || 0);
+
+    return res.status(200).json(
+      files.map((file) => ({
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: !!file.isPublic,
+        parentId: file.parentId,
+      })),
+    );
   }
 }
 

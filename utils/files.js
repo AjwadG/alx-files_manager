@@ -12,6 +12,12 @@ class FilesCollection {
     const file = await collection.find(query).toArray();
     return file;
   }
+
+  static async getPage(query, page) {
+    const collection = dbClient.getCollection('files');
+    const file = await collection.find(query, { skip: (page) * 20, limit: 20 }).toArray();
+    return file;
+  }
 }
 
 export default FilesCollection;
