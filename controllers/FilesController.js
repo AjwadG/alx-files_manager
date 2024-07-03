@@ -1,6 +1,7 @@
 import mongodb from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 import mime from 'mime-types';
+import Queue from 'bull';
 import fs from 'fs';
 import UserCollection from '../utils/users';
 import redisClient from '../utils/redis';
@@ -9,6 +10,8 @@ import FilesCollection from '../utils/files';
 function getObjectId(id) {
   return mongodb.ObjectId.isValid(id) ? new mongodb.ObjectId(id) : '';
 }
+
+const filesQue = new Queue('thumbnails');
 
 class FilesController {
   static async postUpload(req, res) {
@@ -80,6 +83,7 @@ class FilesController {
     const filePath = `${folderPath}/${fileName}`;
     const dataBuffer = Buffer.from(data, 'base64');
     fs.writeFileSync(filePath, dataBuffer);
+    filesQue.add({ fileId, userId: id });
     return res.status(201).json({
       id: fileId,
       userId: id,
@@ -227,6 +231,7 @@ class FilesController {
 
   static async getFile(req, res) {
     const { id } = req.params;
+    const { size } = req.query.size;
     const token = req.headers['x-token'];
     const userId = token ? await redisClient.get(`auth_${token}`) : null;
     const file = await FilesCollection.findOne({
@@ -246,6 +251,12 @@ class FilesController {
     }
     const fileType = mime.contentType(file.name);
     res.setHeader('Content-Type', fileType);
+    if (file.type === 'image' && [500, 250, 100].includes(parseInt(size, 10))) {
+      const newPath = `${file.localPath}_${size}`;
+      if (fs.existsSync(newPath)) {
+        file.localPath = newPath;
+      }
+    }
     const filData = fs.readFileSync(file.localPath);
     return res.status(200).send(filData);
   }
