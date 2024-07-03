@@ -231,7 +231,7 @@ class FilesController {
 
   static async getFile(req, res) {
     const { id } = req.params;
-    const { size } = req.query.size;
+    const { size } = req.query;
     const token = req.headers['x-token'];
     const userId = token ? await redisClient.get(`auth_${token}`) : null;
     const file = await FilesCollection.findOne({

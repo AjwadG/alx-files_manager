@@ -1,7 +1,10 @@
 import mongodb from 'mongodb';
 import sha1 from 'sha1';
+import Queue from 'bull';
 import UserCollection from '../utils/users';
 import redisClient from '../utils/redis';
+
+const usersQue = new Queue('Welcome Email');
 
 class UsersController {
   static async postNew(req, res) {
@@ -21,6 +24,7 @@ class UsersController {
       email,
       password: sha1(password),
     });
+    usersQue.add({ userId });
     return res.status(201).json({ id: userId, email });
   }
 

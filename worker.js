@@ -3,9 +3,11 @@ import Queue from 'bull';
 import mongodb from 'mongodb';
 import imageThumbnail from 'image-thumbnail';
 import fs from 'fs';
+import UserCollection from './utils/users';
 import FilesCollection from './utils/files';
 
 const filesQue = new Queue('thumbnails');
+const usersQue = new Queue('Welcome Email');
 
 function getObjectId(id) {
   return mongodb.ObjectId.isValid(id) ? new mongodb.ObjectId(id) : '';
@@ -32,5 +34,14 @@ filesQue.process(async (job, done) => {
   } else {
     console.log(`File ${fileId} is not an image`);
   }
+  done();
+});
+
+usersQue.process(async (job, done) => {
+  const { userId } = job.data;
+  if (!userId) throw new Error('Missing userId');
+  const user = await UserCollection.findOne({ _id: getObjectId(userId) });
+  if (!user) throw new Error('User not found');
+  console.log(`Welcome ${user.email}!`);
   done();
 });
