@@ -140,13 +140,13 @@ class FilesController {
     const pageNumber = parseInt(page, 10) || 0;
     const id = getObjectId(parentId);
     const query = {
-      parentId: !id ? 0 : id,
+      userId: getObjectId(userId),
+      parentId: !id ? '0' : id,
     };
     const files = await FilesCollection.getPage(
       query,
       pageNumber >= 0 ? pageNumber : 0,
     );
-
     return res.status(200).json(
       files.map((file) => ({
         id: file._id,
