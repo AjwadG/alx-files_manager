@@ -1,5 +1,6 @@
 import mongodb from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
+import mime from 'mime-types';
 import fs from 'fs';
 import UserCollection from '../utils/users';
 import redisClient from '../utils/redis';
@@ -47,7 +48,7 @@ class FilesController {
         userId: mongodb.ObjectId(id),
         name,
         type,
-        parentId: parentId || 0,
+        parentId: parentId ? mongodb.ObjectId(parentId) : 0,
         isPublic: !!isPublic,
       });
       return res.status(201).json({
@@ -56,7 +57,7 @@ class FilesController {
         name,
         type,
         isPublic: !!isPublic,
-        parentId: parentId ? mongodb.ObjectId(parentId) : 0,
+        parentId: parentId || 0,
       });
     }
     const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
@@ -72,8 +73,8 @@ class FilesController {
       isPublic: !!isPublic,
       localPath: `${folderPath}/${fileName}`,
     });
-    const filePath = `${folderPath}/${fileId}`;
-    const dataBuffer = Buffer.from(data, 'base64').toString('utf-8');
+    const filePath = `${folderPath}/${fileName}`;
+    const dataBuffer = Buffer.from(data, 'base64');
     fs.writeFileSync(filePath, dataBuffer);
     return res.status(201).json({
       id: fileId,
@@ -214,6 +215,29 @@ class FilesController {
       isPublic: false,
       parentId: file[0].parentId,
     });
+  }
+
+  static async getFile(req, res) {
+    const { id } = req.params;
+    const token = req.headers['x-token'];
+    const userId = token ? await redisClient.get(`auth_${token}`) : null;
+    const file = await FilesCollection.getFile({ _id: mongodb.ObjectId(id) });
+    if (!file || file.length === 0) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    if (file[0].userId.toString() !== userId && !file[0].isPublic) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    if (file[0].type === 'folder') {
+      return res.status(404).json({ error: "A folder doesn't have content" });
+    }
+    if (!fs.existsSync(file[0].localPath)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    const fileType = mime.lookup(file[0].name.split('.').pop());
+    res.setHeader('Content-Type', fileType);
+    const filData = fs.readFileSync(file[0].localPath);
+    return res.status(200).send(filData);
   }
 }
 
