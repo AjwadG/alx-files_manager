@@ -25,6 +25,12 @@ class FilesCollection {
     const collection = dbClient.getCollection('files');
     await collection.updateOne(query, update);
   }
+
+  static async findOne(query) {
+    const collection = dbClient.getCollection('files');
+    const file = await collection.findOne(query);
+    return file;
+  }
 }
 
 export default FilesCollection;

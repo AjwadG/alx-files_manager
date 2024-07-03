@@ -6,6 +6,10 @@ import UserCollection from '../utils/users';
 import redisClient from '../utils/redis';
 import FilesCollection from '../utils/files';
 
+function getObjectId(id) {
+  return mongodb.ObjectId.isValid(id) ? new mongodb.ObjectId(id) : '';
+}
+
 class FilesController {
   static async postUpload(req, res) {
     const token = req.headers['x-token'];
@@ -14,7 +18,7 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     const user = await UserCollection.getUser({
-      _id: mongodb.ObjectId(id),
+      _id: getObjectId(id),
     });
     if (!user || user.length === 0) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -34,7 +38,7 @@ class FilesController {
     }
     if (parentId) {
       const parent = await FilesCollection.getFile({
-        _id: mongodb.ObjectId(parentId),
+        _id: getObjectId(parentId),
       });
       if (!parent || parent.length === 0) {
         return res.status(400).json({ error: 'Parent not found' });
@@ -45,10 +49,10 @@ class FilesController {
     }
     if (type === 'folder') {
       const fileId = await FilesCollection.createFile({
-        userId: mongodb.ObjectId(id),
+        userId: getObjectId(id),
         name,
         type,
-        parentId: parentId ? mongodb.ObjectId(parentId) : 0,
+        parentId: parentId ? getObjectId(parentId) : 0,
         isPublic: !!isPublic,
       });
       return res.status(201).json({
@@ -67,9 +71,9 @@ class FilesController {
     const fileName = uuidv4();
     const fileId = await FilesCollection.createFile({
       name,
-      userId: mongodb.ObjectId(id),
+      userId: getObjectId(id),
       type,
-      parentId: parentId ? mongodb.ObjectId(parentId) : 0,
+      parentId: parentId ? getObjectId(parentId) : 0,
       isPublic: !!isPublic,
       localPath: `${folderPath}/${fileName}`,
     });
@@ -93,26 +97,26 @@ class FilesController {
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    const user = await UserCollection.getUser({
-      _id: mongodb.ObjectId(userId),
+    const user = await UserCollection.findOne({
+      _id: getObjectId(userId),
     });
-    if (!user || user.length === 0) {
+    if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    const file = await FilesCollection.getFile({
-      _id: mongodb.ObjectId(id),
-      userId: mongodb.ObjectId(userId),
+    const file = await FilesCollection.findOne({
+      _id: getObjectId(id),
+      userId: getObjectId(userId),
     });
-    if (!file || file.length === 0) {
+    if (!file) {
       return res.status(404).json({ error: 'Not found' });
     }
     return res.status(200).json({
-      id: file[0]._id,
-      userId: file[0].userId,
-      name: file[0].name,
-      type: file[0].type,
-      isPublic: !!file[0].isPublic,
-      parentId: file[0].parentId,
+      id: file._id,
+      userId: file.userId,
+      name: file.name,
+      type: file.type,
+      isPublic: !!file.isPublic,
+      parentId: file.parentId,
     });
   }
 
@@ -123,17 +127,21 @@ class FilesController {
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    const user = await UserCollection.getUser({
-      _id: mongodb.ObjectId(userId),
+    const user = await UserCollection.findOne({
+      _id: getObjectId(userId),
     });
-    if (!user || user.length === 0) {
+    if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    const id = !parentId || parentId === '0' ? 0 : mongodb.ObjectId(parentId);
+    const pageNumber = parseInt(page, 10) || 0;
+    const id = getObjectId(parentId);
     const query = {
-      parentId: id,
+      parentId: !id ? 0 : id,
     };
-    const files = await FilesCollection.getPage(query, page || 0);
+    const files = await FilesCollection.getPage(
+      query,
+      pageNumber >= 0 ? pageNumber : 0,
+    );
 
     return res.status(200).json(
       files.map((file) => ({
@@ -155,14 +163,14 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     const user = await UserCollection.getUser({
-      _id: mongodb.ObjectId(userId),
+      _id: getObjectId(userId),
     });
     if (!user || user.length === 0) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     const query = {
-      _id: mongodb.ObjectId(id),
-      userId: mongodb.ObjectId(userId),
+      _id: getObjectId(id),
+      userId: getObjectId(userId),
     };
     const file = await FilesCollection.getFile(query);
     if (!file || file.length === 0) {
@@ -190,14 +198,14 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     const user = await UserCollection.getUser({
-      _id: mongodb.ObjectId(userId),
+      _id: getObjectId(userId),
     });
     if (!user || user.length === 0) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     const query = {
-      _id: mongodb.ObjectId(id),
-      userId: mongodb.ObjectId(userId),
+      _id: getObjectId(id),
+      userId: getObjectId(userId),
     };
     const file = await FilesCollection.getFile(query);
     if (!file || file.length === 0) {
@@ -221,22 +229,24 @@ class FilesController {
     const { id } = req.params;
     const token = req.headers['x-token'];
     const userId = token ? await redisClient.get(`auth_${token}`) : null;
-    const file = await FilesCollection.getFile({ _id: mongodb.ObjectId(id) });
-    if (!file || file.length === 0) {
+    const file = await FilesCollection.findOne({
+      _id: getObjectId(id),
+    });
+    if (!file) {
       return res.status(404).json({ error: 'Not found' });
     }
-    if (file[0].userId.toString() !== userId && !file[0].isPublic) {
+    if (file.userId.toString() !== userId && !file.isPublic) {
       return res.status(404).json({ error: 'Not found' });
     }
-    if (file[0].type === 'folder') {
-      return res.status(404).json({ error: "A folder doesn't have content" });
+    if (file.type === 'folder') {
+      return res.status(400).json({ error: "A folder doesn't have content" });
     }
-    if (!fs.existsSync(file[0].localPath)) {
+    if (!fs.existsSync(file.localPath)) {
       return res.status(404).json({ error: 'Not found' });
     }
-    const fileType = mime.lookup(file[0].name.split('.').pop());
+    const fileType = mime.contentType(file.name);
     res.setHeader('Content-Type', fileType);
-    const filData = fs.readFileSync(file[0].localPath);
+    const filData = fs.readFileSync(file.localPath);
     return res.status(200).send(filData);
   }
 }

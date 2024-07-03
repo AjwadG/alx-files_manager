@@ -1,4 +1,5 @@
 import mongodb from 'mongodb';
+import sha1 from 'sha1';
 import UserCollection from '../utils/users';
 import redisClient from '../utils/redis';
 
@@ -11,11 +12,15 @@ class UsersController {
     if (!password) {
       return res.status(400).json({ error: 'Missing password' });
     }
-    const user = await UserCollection.getUser({ email });
-    if (user && user.length > 0) {
-      return res.status(400).json({ error: 'Already exists' });
+    const user = await UserCollection.findOne({ email });
+    if (user) {
+      return res.status(400).json({ error: 'Already exist' });
     }
-    const userId = await UserCollection.createUser({ email, password });
+
+    const userId = await UserCollection.createUser({
+      email,
+      password: sha1(password),
+    });
     return res.status(201).json({ id: userId, email });
   }
 
